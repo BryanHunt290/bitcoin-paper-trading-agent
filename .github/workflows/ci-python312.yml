@@ -26,13 +26,16 @@ jobs:
 
       - name: Install test dependencies
         run: |
-          python -m pip install -r requirements.txt -r requirements-dev.txt -r cdk/requirements.txt
+          python -m pip install -r requirements.txt -r requirements-dev.txt -r requirements-dashboard.txt -r cdk/requirements.txt
 
       - name: Run tests
         run: python -m pytest -q
 
       - name: Compile source
-        run: python -m compileall src
+        run: python -m compileall src streamlit_app.py
+
+      - name: Validate Streamlit startup
+        run: python -m streamlit run streamlit_app.py --server.headless true --server.port 8501 & sleep 8; curl --fail http://127.0.0.1:8501/_stcore/health
 
       - name: Synthesize reviewed CDK stacks
         run: python cdk/run_synth.py

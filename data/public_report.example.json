@@ -1,0 +1,103 @@
+{
+  "schema_version": 1,
+  "data_status": "SAMPLE",
+  "mode": "PAPER",
+  "symbol": "BTC-USD",
+  "updated_at": "2026-09-03T15:00:00Z",
+  "agent_status": "RUNNING",
+  "portfolio": {
+    "starting_cash": 10000.0,
+    "available_cash": 7690.15,
+    "btc_quantity": 0.0302,
+    "avg_entry_price": 75310.42,
+    "current_price": 76844.2,
+    "total_equity": 10010.84,
+    "realized_pnl": -35.64,
+    "unrealized_pnl": 46.48
+  },
+  "position": {
+    "status": "OPEN",
+    "quantity": 0.0302,
+    "entry_price": 75310.42,
+    "current_price": 76844.2,
+    "unrealized_pnl": 46.48,
+    "take_profit_price": 77569.73,
+    "stop_loss_price": 73804.21,
+    "trailing_stop_price": 75691.54
+  },
+  "strategy": {
+    "name": "Deterministic dip entry",
+    "status": "ENABLED",
+    "signal": "HOLD",
+    "latest_decision": "Position open; monitoring paper exit thresholds.",
+    "last_evaluated_at": "2026-09-03T15:00:00Z",
+    "automatic_exit_status": "ARMED"
+  },
+  "risk": {
+    "status": "NORMAL",
+    "max_position_usd": 2500.0,
+    "daily_loss_limit_pct": 0.02,
+    "max_drawdown_limit_pct": 0.1,
+    "current_drawdown_pct": 0.0064,
+    "controls_triggered": []
+  },
+  "performance": {
+    "completed_trades": 6,
+    "wins": 3,
+    "losses": 3,
+    "win_rate": 0.5,
+    "return_pct": 0.001084,
+    "max_drawdown_pct": 0.0128
+  },
+  "trades": [
+    {
+      "executed_at": "2026-09-03T11:15:00Z",
+      "side": "BUY",
+      "reason": "DIP_ENTRY",
+      "price": 75540.0,
+      "quantity": 0.012,
+      "notional": 906.48,
+      "realized_pnl": null
+    },
+    {
+      "executed_at": "2026-09-03T12:45:00Z",
+      "side": "SELL",
+      "reason": "TAKE_PROFIT",
+      "price": 76720.0,
+      "quantity": 0.012,
+      "notional": 920.64,
+      "realized_pnl": 13.24
+    },
+    {
+      "executed_at": "2026-09-03T13:30:00Z",
+      "side": "BUY",
+      "reason": "DIP_ENTRY",
+      "price": 75310.42,
+      "quantity": 0.0302,
+      "notional": 2274.38,
+      "realized_pnl": null
+    }
+  ],
+  "candles": [
+    {"timestamp":"2026-09-03T10:00:00Z","open":76810.0,"high":77020.0,"low":76640.0,"close":76940.0,"volume":108.2},
+    {"timestamp":"2026-09-03T10:15:00Z","open":76940.0,"high":77010.0,"low":76580.0,"close":76620.0,"volume":121.8},
+    {"timestamp":"2026-09-03T10:30:00Z","open":76620.0,"high":76740.0,"low":76190.0,"close":76310.0,"volume":142.1},
+    {"timestamp":"2026-09-03T10:45:00Z","open":76310.0,"high":76420.0,"low":75880.0,"close":76020.0,"volume":167.4},
+    {"timestamp":"2026-09-03T11:00:00Z","open":76020.0,"high":76110.0,"low":75420.0,"close":75610.0,"volume":188.7},
+    {"timestamp":"2026-09-03T11:15:00Z","open":75610.0,"high":75820.0,"low":75360.0,"close":75540.0,"volume":201.5},
+    {"timestamp":"2026-09-03T11:30:00Z","open":75540.0,"high":75910.0,"low":75490.0,"close":75820.0,"volume":176.3},
+    {"timestamp":"2026-09-03T11:45:00Z","open":75820.0,"high":76180.0,"low":75740.0,"close":76090.0,"volume":154.9},
+    {"timestamp":"2026-09-03T12:00:00Z","open":76090.0,"high":76360.0,"low":75980.0,"close":76270.0,"volume":149.2},
+    {"timestamp":"2026-09-03T12:15:00Z","open":76270.0,"high":76530.0,"low":76140.0,"close":76490.0,"volume":145.4},
+    {"timestamp":"2026-09-03T12:30:00Z","open":76490.0,"high":76780.0,"low":76380.0,"close":76640.0,"volume":139.8},
+    {"timestamp":"2026-09-03T12:45:00Z","open":76640.0,"high":76860.0,"low":76590.0,"close":76720.0,"volume":132.6},
+    {"timestamp":"2026-09-03T13:00:00Z","open":76720.0,"high":76810.0,"low":76080.0,"close":76210.0,"volume":184.1},
+    {"timestamp":"2026-09-03T13:15:00Z","open":76210.0,"high":76320.0,"low":75510.0,"close":75620.0,"volume":212.7},
+    {"timestamp":"2026-09-03T13:30:00Z","open":75620.0,"high":75710.0,"low":75180.0,"close":75310.42,"volume":224.5},
+    {"timestamp":"2026-09-03T13:45:00Z","open":75310.42,"high":75780.0,"low":75240.0,"close":75690.0,"volume":196.3},
+    {"timestamp":"2026-09-03T14:00:00Z","open":75690.0,"high":76120.0,"low":75610.0,"close":75980.0,"volume":173.6},
+    {"timestamp":"2026-09-03T14:15:00Z","open":75980.0,"high":76510.0,"low":75890.0,"close":76380.0,"volume":161.9},
+    {"timestamp":"2026-09-03T14:30:00Z","open":76380.0,"high":76890.0,"low":76260.0,"close":76710.0,"volume":158.2},
+    {"timestamp":"2026-09-03T14:45:00Z","open":76710.0,"high":76920.0,"low":76540.0,"close":76844.2,"volume":146.7}
+  ]
+}
