@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 
 import altair as alt
 import pandas as pd
@@ -44,18 +44,27 @@ def percent(value: float) -> str:
     return f"{value:.2%}"
 
 
+def optional_count(value: int | None) -> str:
+    return str(value) if value is not None else "Unavailable"
+
+
+def optional_percent(value: float | None) -> str:
+    return percent(value) if value is not None else "Unavailable"
+
+
 def filtered_frames(
     report: PublicPaperReport,
     time_range: str,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     candles = pd.DataFrame([candle.model_dump() for candle in report.candles])
-    candles["timestamp"] = pd.to_datetime(candles["timestamp"], utc=True)
+    if not candles.empty:
+        candles["timestamp"] = pd.to_datetime(candles["timestamp"], utc=True)
     trades = pd.DataFrame([trade.model_dump() for trade in report.trades])
     if not trades.empty:
         trades["executed_at"] = pd.to_datetime(trades["executed_at"], utc=True)
 
     window = TIME_RANGES[time_range]
-    if window is not None:
+    if window is not None and not candles.empty:
         cutoff = candles["timestamp"].max() - window
         candles = candles[candles["timestamp"] >= cutoff]
         if not trades.empty:
@@ -140,7 +149,7 @@ with st.container(
     horizontal_alignment="distribute",
     vertical_alignment="center",
 ):
-    st.title("Bitcoin Paper Trading Agent", icon=":material/candlestick_chart:")
+    st.title("Bitcoin paper agent", icon=":material/candlestick_chart:")
     if st.button("Refresh data", icon=":material/refresh:", type="tertiary"):
         load_report_cached.clear()
         st.rerun()
@@ -149,7 +158,7 @@ st.warning(
     "READ ONLY — This dashboard cannot place or modify trades.",
     icon=":material/visibility:",
 )
-st.markdown("**PAPER TRADING ONLY · PUBLIC READ-ONLY OBSERVABILITY**")
+st.markdown("**PAPER TRADING ONLY · PUBLIC READ-ONLY INTERFACE**")
 
 with st.sidebar:
     st.header("View", icon=":material/tune:")
@@ -177,143 +186,236 @@ except PublicReportUnavailable:
     st.stop()
 
 with st.container(horizontal=True, vertical_alignment="center"):
-    if report.data_status == "LIVE":
+    report_age = datetime.now(timezone.utc) - report.updated_at.astimezone(timezone.utc)
+    feed_is_fresh = (
+        report.data_status == "LIVE"
+        and timedelta(minutes=-2) <= report_age <= timedelta(minutes=15)
+    )
+    if feed_is_fresh:
         st.badge(
             "LIVE PROJECT DATA — PAPER TRADING ONLY",
             color="green",
             icon=":material/sensors:",
         )
-    else:
+    elif report.data_status == "SAMPLE":
         st.badge(
             "SANITIZED SAMPLE DATA — PAPER TRADING ONLY",
             color="orange",
             icon=":material/science:",
         )
-    status_color = "green" if report.agent_status == "RUNNING" else "orange"
+    else:
+        st.badge(
+            "LIVE PROJECT DATA STALE — LAST CONFIRMED SNAPSHOT",
+            color="orange",
+            icon=":material/schedule:",
+        )
+    displayed_agent_status = report.agent_status if report.data_status == "SAMPLE" or feed_is_fresh else "DEGRADED"
+    status_color = "green" if displayed_agent_status == "RUNNING" else "orange"
     st.badge(
-        f"Bot status: {report.agent_status}",
+        f"Bot status: {displayed_agent_status}",
         color=status_color,
         icon=":material/smart_toy:",
     )
     st.caption(f"Last report update: {report.updated_at.astimezone().strftime('%b %d, %Y %H:%M:%S %Z')}")
 
-closes = [candle.close for candle in report.candles[-24:]]
 with st.container(horizontal=True):
-    st.metric(
-        "BTC-USD",
-        money(report.portfolio.current_price),
-        border=True,
-        chart_data=closes,
-        chart_type="line",
-    )
-    st.metric("Paper account equity", money(report.portfolio.total_equity), border=True)
-    st.metric("Simulated cash", money(report.portfolio.available_cash), border=True)
-    st.metric("Simulated BTC", btc(report.portfolio.btc_quantity), border=True)
-    st.metric(
-        "Total return",
-        percent(report.performance.return_pct),
-        border=True,
-    )
+    st.metric("Mode", "PAPER", border=True)
+    st.metric("Total equity", money(report.portfolio.total_equity), border=True)
+    st.metric("Available cash", money(report.portfolio.available_cash), border=True)
+    st.metric("BTC holding", btc(report.portfolio.btc_quantity), border=True)
+
+view = st.segmented_control(
+    "Workspace",
+    options=["Overview", "Market", "Automatic strategy", "Performance", "Risk & history"],
+    default="Overview",
+    key="workspace_view",
+    bind="query-params",
+)
 
 candle_frame, marker_frame = filtered_frames(report, str(time_range))
-with st.container(border=True):
-    st.subheader("BTC-USD paper-trading timeline", icon=":material/candlestick_chart:")
-    st.caption("Public market candles with simulated BUY and SELL markers. Zoom and pan are display-only.")
-    st.altair_chart(candlestick_chart(candle_frame, marker_frame), key="paper_candles")
 
-left, right = st.columns([3, 2])
-with left.container(border=True, height="stretch"):
-    st.subheader("Current paper position", icon=":material/account_balance_wallet:")
-    with st.container(horizontal=True):
-        st.metric("Position", report.position.status)
-        st.metric("Quantity", btc(report.position.quantity))
-        st.metric("Average entry", money(report.position.entry_price))
-        st.metric("Unrealized P&L", money(report.position.unrealized_pnl))
-    if report.position.status == "OPEN":
-        levels = {
-            "Current price": money(report.position.current_price),
-            "Take-profit level": money(report.position.take_profit_price or 0),
-            "Stop-loss level": money(report.position.stop_loss_price or 0),
-            "Trailing-stop level": money(report.position.trailing_stop_price or 0),
-        }
-        st.table(levels, border="horizontal", width="stretch")
-
-with right.container(border=True, height="stretch"):
-    st.subheader("Strategy status", icon=":material/strategy:")
-    with st.container(horizontal=True):
-        st.badge(report.strategy.status, color="green" if report.strategy.status == "ENABLED" else "gray")
-        st.badge(f"Signal: {report.strategy.signal}", color="blue")
-        st.badge(f"Auto exit: {report.strategy.automatic_exit_status}", color="violet")
-    st.markdown(f"**{report.strategy.name}**")
-    st.write(report.strategy.latest_decision)
-    st.caption(
-        f"Last evaluated: {report.strategy.last_evaluated_at.astimezone().strftime('%b %d, %Y %H:%M:%S %Z')}"
-    )
-
-st.subheader("Paper performance", icon=":material/query_stats:")
-with st.container(horizontal=True):
-    st.metric("Completed trades", str(report.performance.completed_trades), border=True)
-    st.metric("Wins", str(report.performance.wins), border=True)
-    st.metric("Losses", str(report.performance.losses), border=True)
-    st.metric("Win rate", percent(report.performance.win_rate), border=True)
-    st.metric("Maximum drawdown", percent(report.performance.max_drawdown_pct), border=True)
-    st.metric("Realized P&L", money(report.portfolio.realized_pnl), border=True)
-
-risk_col, history_col = st.columns([2, 3])
-with risk_col.container(border=True, height="stretch"):
-    st.subheader("Risk-control status", icon=":material/shield:")
-    risk_color = {"NORMAL": "green", "CAUTION": "orange", "HALTED": "red"}[report.risk.status]
-    st.badge(report.risk.status, color=risk_color, icon=":material/health_and_safety:")
-    st.table(
-        {
-            "Maximum paper position": money(report.risk.max_position_usd),
-            "Daily-loss limit": percent(report.risk.daily_loss_limit_pct),
-            "Drawdown limit": percent(report.risk.max_drawdown_limit_pct),
-            "Current drawdown": percent(report.risk.current_drawdown_pct),
-        },
-        border="horizontal",
-        width="stretch",
-    )
-    if report.risk.controls_triggered:
-        st.warning(
-            "Triggered controls: " + ", ".join(report.risk.controls_triggered),
-            icon=":material/warning:",
+if view == "Overview":
+    left, right = st.columns([3, 2])
+    with left.container(border=True, height="stretch"):
+        st.subheader("Paper portfolio", icon=":material/account_balance_wallet:")
+        with st.container(horizontal=True):
+            st.metric("Starting balance", money(report.portfolio.starting_cash))
+            st.metric("Current BTC price", money(report.portfolio.current_price))
+            st.metric("Average entry", money(report.portfolio.avg_entry_price))
+        with st.container(horizontal=True):
+            st.metric("Realized P&L", money(report.portfolio.realized_pnl))
+            st.metric("Unrealized P&L", money(report.portfolio.unrealized_pnl))
+            st.metric("Position", report.position.status)
+    with right.container(border=True, height="stretch"):
+        st.subheader("Public safety boundaries", icon=":material/shield:")
+        st.markdown(
+            "- BTC-USD only\n"
+            "- Paper execution only\n"
+            "- No AWS credentials\n"
+            "- No private exchange credentials\n"
+            "- No order or configuration controls"
         )
-    else:
-        st.caption("No risk controls are currently triggered.")
+        st.caption("This page displays a sanitized reporting document only.")
 
-with history_col.container(border=True, height="stretch"):
-    st.subheader("Recent paper trades", icon=":material/receipt_long:")
-    if report.trades:
-        history = pd.DataFrame(
-            [
+elif view == "Market":
+    with st.container(border=True):
+        st.subheader("BTC-USD paper-trading timeline", icon=":material/candlestick_chart:")
+        if candle_frame.empty:
+            st.info(
+                "Historical candles are not included in the live sanitized status feed.",
+                icon=":material/info:",
+            )
+            st.metric("Latest BTC-USD price", money(report.portfolio.current_price))
+        else:
+            st.caption(
+                "Public market candles with simulated BUY and SELL markers. "
+                "Zoom and pan are display-only."
+            )
+            st.altair_chart(candlestick_chart(candle_frame, marker_frame), key="paper_candles")
+    with st.container(border=True):
+        st.subheader("Current paper position", icon=":material/account_balance_wallet:")
+        with st.container(horizontal=True):
+            st.metric("Position", report.position.status)
+            st.metric("Quantity", btc(report.position.quantity))
+            st.metric("Average entry", money(report.position.entry_price))
+            st.metric("Unrealized P&L", money(report.position.unrealized_pnl))
+        if report.position.status == "OPEN":
+            st.table(
                 {
-                    "Executed": trade.executed_at,
-                    "Side": trade.side,
-                    "Reason": trade.reason.replace("_", " ").title(),
-                    "Price": trade.price,
-                    "BTC quantity": trade.quantity,
-                    "Paper notional": trade.notional,
-                    "Realized P&L": trade.realized_pnl,
-                }
-                for trade in reversed(report.trades)
-            ]
+                    "Current price": money(report.position.current_price),
+                    "Take-profit level": money(report.position.take_profit_price or 0),
+                    "Stop-loss level": money(report.position.stop_loss_price or 0),
+                    "Trailing-stop level": money(report.position.trailing_stop_price or 0),
+                },
+                border="horizontal",
+                width="stretch",
+            )
+
+elif view == "Automatic strategy":
+    st.warning(
+        "PAPER TRADING / SIMULATION ONLY — this public page cannot place an order.",
+        icon=":material/science:",
+    )
+    with st.container(horizontal=True):
+        st.metric("Automatic dip buy", report.strategy.status, border=True)
+        scheduler_status = (
+            report.strategy.scheduler_status
+            if report.data_status == "SAMPLE" or feed_is_fresh
+            else "UNKNOWN"
         )
-        st.dataframe(
-            history,
-            hide_index=True,
-            height=300,
-            key="paper_trade_history",
-            column_config={
-                "Executed": st.column_config.DatetimeColumn(format="MMM DD, YYYY HH:mm"),
-                "Price": st.column_config.NumberColumn(format="$%.2f"),
-                "BTC quantity": st.column_config.NumberColumn(format="%.8f"),
-                "Paper notional": st.column_config.NumberColumn(format="$%.2f"),
-                "Realized P&L": st.column_config.NumberColumn(format="$%.2f"),
+        st.metric("Scheduler", scheduler_status, border=True)
+        st.metric("Paper mode", "ON", border=True)
+    with st.container(horizontal=True):
+        st.metric("Evaluation frequency", report.strategy.evaluation_frequency, border=True)
+        st.metric(
+            "Last evaluation",
+            report.strategy.last_evaluated_at.astimezone().strftime("%b %d, %Y %H:%M %Z"),
+            border=True,
+        )
+        st.metric("Last result", report.strategy.last_result, border=True)
+    with st.container(horizontal=True):
+        st.metric("Current BTC price", money(report.portfolio.current_price), border=True)
+        st.metric("60-minute reference", money(report.strategy.reference_price), border=True)
+        st.metric("Measured dip", percent(report.strategy.measured_dip_pct), border=True)
+
+    config_col, evaluation_col = st.columns(2)
+    with config_col.container(border=True, height="stretch"):
+        st.subheader("Fixed configuration")
+        st.table(
+            {
+                "Pair": report.symbol,
+                "Dip threshold": percent(report.strategy.threshold_pct),
+                "Lookback": f"{report.strategy.lookback_minutes} minutes",
+                "Paper order": money(report.strategy.order_size_usd),
+                "Cooldown": f"{report.strategy.cooldown_minutes} minutes",
+                "Decision source": report.strategy.decision_source.replace("_", " ").title(),
             },
+            border="horizontal",
+            width="stretch",
         )
-    else:
-        st.caption("No completed paper trades are available in the public report.")
+    with evaluation_col.container(border=True, height="stretch"):
+        st.subheader("Latest evaluation")
+        st.metric("Result", report.strategy.last_result)
+        st.write(report.strategy.latest_decision)
+        st.write(f"Signal: {report.strategy.signal}")
+        st.write(f"Automatic exit: {report.strategy.automatic_exit_status}")
+
+elif view == "Performance":
+    with st.container(horizontal=True):
+        st.metric("Total return", percent(report.performance.return_pct), border=True)
+        st.metric("Completed trades", optional_count(report.performance.completed_trades), border=True)
+        st.metric("Wins", optional_count(report.performance.wins), border=True)
+        st.metric("Losses", optional_count(report.performance.losses), border=True)
+        st.metric("Win rate", optional_percent(report.performance.win_rate), border=True)
+        st.metric("Maximum drawdown", percent(report.performance.max_drawdown_pct), border=True)
+    with st.container(border=True):
+        st.subheader("Paper equity comparison", icon=":material/query_stats:")
+        equity = pd.DataFrame(
+            {
+                "Account value": ["Starting paper balance", "Current paper equity"],
+                "USD": [report.portfolio.starting_cash, report.portfolio.total_equity],
+            }
+        )
+        st.bar_chart(equity, x="Account value", y="USD", horizontal=True)
+
+elif view == "Risk & history":
+    risk_col, history_col = st.columns([2, 3])
+    with risk_col.container(border=True, height="stretch"):
+        st.subheader("Risk-control status", icon=":material/shield:")
+        risk_color = {"NORMAL": "green", "CAUTION": "orange", "HALTED": "red"}[
+            report.risk.status
+        ]
+        st.badge(report.risk.status, color=risk_color, icon=":material/health_and_safety:")
+        st.table(
+            {
+                "Maximum paper position": money(report.risk.max_position_usd),
+                "Daily-loss limit": percent(report.risk.daily_loss_limit_pct),
+                "Drawdown limit": percent(report.risk.max_drawdown_limit_pct),
+                "Current drawdown": percent(report.risk.current_drawdown_pct),
+            },
+            border="horizontal",
+            width="stretch",
+        )
+        if report.risk.controls_triggered:
+            st.warning(
+                "Triggered controls: " + ", ".join(report.risk.controls_triggered),
+                icon=":material/warning:",
+            )
+        else:
+            st.caption("No risk controls are currently triggered.")
+
+    with history_col.container(border=True, height="stretch"):
+        st.subheader("Recent paper trades", icon=":material/receipt_long:")
+        if report.trades:
+            history = pd.DataFrame(
+                [
+                    {
+                        "Executed": trade.executed_at,
+                        "Side": trade.side,
+                        "Reason": trade.reason.replace("_", " ").title(),
+                        "Price": trade.price,
+                        "BTC quantity": trade.quantity,
+                        "Paper notional": trade.notional,
+                        "Realized P&L": trade.realized_pnl,
+                    }
+                    for trade in reversed(report.trades)
+                ]
+            )
+            st.dataframe(
+                history,
+                hide_index=True,
+                height=300,
+                key="paper_trade_history",
+                column_config={
+                    "Executed": st.column_config.DatetimeColumn(format="MMM DD, YYYY HH:mm"),
+                    "Price": st.column_config.NumberColumn(format="$%.2f"),
+                    "BTC quantity": st.column_config.NumberColumn(format="%.8f"),
+                    "Paper notional": st.column_config.NumberColumn(format="$%.2f"),
+                    "Realized P&L": st.column_config.NumberColumn(format="$%.2f"),
+                },
+            )
+        else:
+            st.caption("No completed paper trades are available in the public report.")
 
 st.caption(
     "Educational observability surface only. No real-money execution, financial advice, or profitability guarantee."

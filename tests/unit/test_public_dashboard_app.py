@@ -21,23 +21,53 @@ def test_dashboard_renders_portfolio_history_and_paper_mode(monkeypatch):
 
     assert not app.exception
     metrics = {metric.label: metric.value for metric in app.metric}
-    assert metrics["BTC-USD"] == "$76,844.20"
-    assert metrics["Paper account equity"] == "$10,010.84"
-    assert metrics["Simulated cash"] == "$7,690.15"
-    assert metrics["Simulated BTC"] == "0.03020000 BTC"
+    assert metrics["Mode"] == "PAPER"
+    assert metrics["Total equity"] == "$10,010.84"
+    assert metrics["Available cash"] == "$7,690.15"
+    assert metrics["BTC holding"] == "0.03020000 BTC"
+    assert metrics["Starting balance"] == "$10,000.00"
+    assert metrics["Current BTC price"] == "$76,844.20"
     assert metrics["Average entry"] == "$75,310.42"
     assert metrics["Realized P&L"] == "$-35.64"
     assert metrics["Unrealized P&L"] == "$46.48"
+
+    app.segmented_control(key="workspace_view").set_value("Performance").run()
+    assert not app.exception
+    metrics = {metric.label: metric.value for metric in app.metric}
     assert metrics["Completed trades"] == "6"
     assert metrics["Win rate"] == "50.00%"
     assert metrics["Maximum drawdown"] == "1.28%"
 
+    app.segmented_control(key="workspace_view").set_value("Risk & history").run()
+    assert not app.exception
     assert len(app.dataframe) == 1
     history = app.dataframe[0].value
     assert list(history["Side"]) == ["BUY", "SELL", "BUY"]
     assert list(history["Reason"]) == ["Dip Entry", "Take Profit", "Dip Entry"]
     assert any("PAPER TRADING ONLY" in element.value for element in app.markdown)
     assert app.warning[0].value == "READ ONLY — This dashboard cannot place or modify trades."
+
+
+def test_automatic_strategy_view_emulates_private_status_without_controls(monkeypatch):
+    monkeypatch.delenv("PUBLIC_REPORT_URL", raising=False)
+    monkeypatch.delenv("PUBLIC_REPORT_ALLOWED_HOST", raising=False)
+    app = run_app()
+
+    app.segmented_control(key="workspace_view").set_value("Automatic strategy").run()
+
+    assert not app.exception
+    metrics = {metric.label: metric.value for metric in app.metric}
+    assert metrics["Automatic dip buy"] == "ENABLED"
+    assert metrics["Scheduler"] == "ENABLED"
+    assert metrics["Paper mode"] == "ON"
+    assert metrics["Evaluation frequency"] == "Every 5 minutes"
+    assert metrics["Last result"] == "NO_DIP"
+    assert metrics["60-minute reference"] == "$77,020.00"
+    assert not any(
+        term in button.label.lower()
+        for button in app.button
+        for term in ("buy", "sell", "start", "stop", "reset", "connect")
+    )
 
 
 def test_public_ui_has_no_order_or_administrative_controls(monkeypatch):

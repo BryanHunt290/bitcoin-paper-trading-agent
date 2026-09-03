@@ -28,10 +28,20 @@
   "strategy": {
     "name": "Deterministic dip entry",
     "status": "ENABLED",
+    "scheduler_status": "ENABLED",
+    "evaluation_frequency": "Every 5 minutes",
     "signal": "HOLD",
+    "last_result": "NO_DIP",
     "latest_decision": "Position open; monitoring paper exit thresholds.",
     "last_evaluated_at": "2026-09-03T15:00:00Z",
-    "automatic_exit_status": "ARMED"
+    "automatic_exit_status": "ARMED",
+    "reference_price": 77020.0,
+    "measured_dip_pct": 0.0022825,
+    "threshold_pct": 0.02,
+    "lookback_minutes": 60,
+    "order_size_usd": 25.0,
+    "cooldown_minutes": 60,
+    "decision_source": "DETERMINISTIC_RULE"
   },
   "risk": {
     "status": "NORMAL",

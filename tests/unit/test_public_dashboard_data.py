@@ -40,8 +40,31 @@ def test_public_report_contract_accepts_sanitized_sample():
     assert report.portfolio.available_cash == pytest.approx(7690.15)
     assert report.position.status == "OPEN"
     assert report.strategy.automatic_exit_status == "ARMED"
+    assert report.strategy.scheduler_status == "ENABLED"
+    assert report.strategy.last_result == "NO_DIP"
     assert len(report.trades) == 3
     assert len(report.candles) == 20
+
+
+def test_live_status_contract_accepts_unavailable_history_metrics():
+    payload = json.loads(SAMPLE_PATH.read_text(encoding="utf-8"))
+    payload["data_status"] = "LIVE"
+    payload["performance"].update(
+        {
+            "completed_trades": None,
+            "wins": None,
+            "losses": None,
+            "win_rate": None,
+        }
+    )
+    payload["trades"] = []
+    payload["candles"] = []
+
+    report = parse_public_report(json.dumps(payload).encode())
+
+    assert report.data_status == "LIVE"
+    assert report.performance.completed_trades is None
+    assert report.candles == []
 
 
 @pytest.mark.parametrize(

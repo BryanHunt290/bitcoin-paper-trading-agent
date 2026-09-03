@@ -109,19 +109,57 @@ class Position(PublicModel):
 class Strategy(PublicModel):
     name: Literal["Deterministic dip entry"]
     status: Literal["ENABLED", "DISABLED"]
+    scheduler_status: Literal["ENABLED", "DISABLED", "UNKNOWN"]
+    evaluation_frequency: Literal["Every 5 minutes"]
     signal: Literal["BUY", "SELL", "HOLD", "NO_TRADE"]
+    last_result: Literal[
+        "NO_DIP",
+        "SIGNAL_ALREADY_ACTIVE",
+        "SIGNAL_REPLAY",
+        "COOLDOWN_ACTIVE",
+        "PAPER_BUY_COMMITTED",
+        "PAPER_EXIT_COMMITTED",
+        "EXIT_REJECTED",
+        "REJECTED",
+        "MARKET_UNAVAILABLE",
+        "STATE_UNAVAILABLE",
+        "STATE_INVALID",
+        "DISABLED",
+    ]
     latest_decision: Literal[
         "Waiting for next scheduled evaluation.",
         "No entry signal; monitoring BTC-USD.",
         "Position open; monitoring paper exit thresholds.",
         "Paper entry signal rejected by risk controls.",
         "Automatic paper exit condition met.",
+        "Paper entry completed; monitoring paper position.",
+        "Automatic paper exit completed.",
+        "Evaluation unavailable; previous paper state preserved.",
         "Strategy paused.",
     ]
     last_evaluated_at: datetime
     automatic_exit_status: Literal["IDLE", "ARMED", "TRIGGERED"]
+    reference_price: float = Field(gt=0)
+    measured_dip_pct: float = Field(ge=0, le=1)
+    threshold_pct: float = Field(gt=0, le=1)
+    lookback_minutes: Literal[60]
+    order_size_usd: float = Field(gt=0)
+    cooldown_minutes: Literal[60]
+    decision_source: Literal["DETERMINISTIC_RULE"]
 
     _timestamp_is_aware = field_validator("last_evaluated_at")(_require_timezone)
+
+    @field_validator(
+        "reference_price",
+        "measured_dip_pct",
+        "threshold_pct",
+        "order_size_usd",
+    )
+    @classmethod
+    def strategy_values_are_finite(cls, value: float) -> float:
+        if not math.isfinite(value):
+            raise ValueError("strategy values must be finite")
+        return value
 
 
 class RiskStatus(PublicModel):
@@ -141,10 +179,10 @@ class RiskStatus(PublicModel):
 
 
 class Performance(PublicModel):
-    completed_trades: int = Field(ge=0)
-    wins: int = Field(ge=0)
-    losses: int = Field(ge=0)
-    win_rate: float = Field(ge=0, le=1)
+    completed_trades: int | None = Field(default=None, ge=0)
+    wins: int | None = Field(default=None, ge=0)
+    losses: int | None = Field(default=None, ge=0)
+    win_rate: float | None = Field(default=None, ge=0, le=1)
     return_pct: float
     max_drawdown_pct: float = Field(ge=0, le=1)
 
@@ -157,7 +195,12 @@ class Performance(PublicModel):
 
     @model_validator(mode="after")
     def totals_are_consistent(self) -> "Performance":
-        if self.wins + self.losses > self.completed_trades:
+        if (
+            self.wins is not None
+            and self.losses is not None
+            and self.completed_trades is not None
+            and self.wins + self.losses > self.completed_trades
+        ):
             raise ValueError("win/loss totals exceed completed trades")
         return self
 
@@ -175,7 +218,7 @@ class PublicPaperReport(PublicModel):
     risk: RiskStatus
     performance: Performance
     trades: list[PublicTrade] = Field(default_factory=list, max_length=500)
-    candles: list[Candle] = Field(min_length=1, max_length=5000)
+    candles: list[Candle] = Field(default_factory=list, max_length=5000)
 
     _timestamp_is_aware = field_validator("updated_at")(_require_timezone)
 
