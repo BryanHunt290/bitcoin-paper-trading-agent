@@ -15,7 +15,9 @@ DEFAULT_REPORT_PATH = Path(__file__).resolve().parents[2] / "data" / "public_rep
 DEFAULT_PUBLIC_REPORT_URL = "https://d7b1bfh5qyfdc.cloudfront.net/public-latest.json"
 DEFAULT_PUBLIC_REPORT_ALLOWED_HOST = "d7b1bfh5qyfdc.cloudfront.net"
 MAX_REPORT_BYTES = 2_000_000
-PUBLIC_ERROR_MESSAGE = "Data temporarily unavailable"
+PUBLIC_ERROR_MESSAGE = "Public report is temporarily unavailable."
+PUBLIC_CONFIG_ERROR_MESSAGE = "Public report unavailable (source configuration invalid)."
+PUBLIC_FORMAT_ERROR_MESSAGE = "Public report unavailable (invalid data format)."
 
 
 class PublicReportUnavailable(RuntimeError):
@@ -25,12 +27,12 @@ class PublicReportUnavailable(RuntimeError):
 def parse_public_report(payload: bytes) -> PublicPaperReport:
     """Validate bytes against the strict, public-safe reporting contract."""
     if not payload or len(payload) > MAX_REPORT_BYTES:
-        raise PublicReportUnavailable(PUBLIC_ERROR_MESSAGE)
+        raise PublicReportUnavailable(PUBLIC_FORMAT_ERROR_MESSAGE)
     try:
         raw = json.loads(payload.decode("utf-8"))
         return PublicPaperReport.model_validate(raw)
     except (UnicodeDecodeError, json.JSONDecodeError, ValidationError, TypeError, ValueError) as exc:
-        raise PublicReportUnavailable(PUBLIC_ERROR_MESSAGE) from exc
+        raise PublicReportUnavailable(PUBLIC_FORMAT_ERROR_MESSAGE) from exc
 
 
 def configured_source() -> tuple[str, str]:
@@ -49,7 +51,7 @@ def _validate_source_url(source_url: str, allowed_host: str) -> None:
         parsed = urlsplit(source_url)
         port = parsed.port
     except ValueError as exc:
-        raise PublicReportUnavailable(PUBLIC_ERROR_MESSAGE) from exc
+        raise PublicReportUnavailable(PUBLIC_CONFIG_ERROR_MESSAGE) from exc
     if (
         parsed.scheme != "https"
         or not parsed.hostname
@@ -60,7 +62,7 @@ def _validate_source_url(source_url: str, allowed_host: str) -> None:
         or parsed.query
         or parsed.fragment
     ):
-        raise PublicReportUnavailable(PUBLIC_ERROR_MESSAGE)
+        raise PublicReportUnavailable(PUBLIC_CONFIG_ERROR_MESSAGE)
 
 
 def load_public_report(
@@ -74,9 +76,9 @@ def load_public_report(
         try:
             return parse_public_report(local_path.read_bytes())
         except (OSError, PublicReportUnavailable) as exc:
-            raise PublicReportUnavailable(PUBLIC_ERROR_MESSAGE) from exc
+            raise PublicReportUnavailable(PUBLIC_FORMAT_ERROR_MESSAGE) from exc
     if not source_url or not allowed_host:
-        raise PublicReportUnavailable(PUBLIC_ERROR_MESSAGE)
+        raise PublicReportUnavailable(PUBLIC_CONFIG_ERROR_MESSAGE)
 
     _validate_source_url(source_url, allowed_host)
     response = None
@@ -89,17 +91,19 @@ def load_public_report(
             stream=True,
         )
         if response.status_code != 200:
-            raise PublicReportUnavailable(PUBLIC_ERROR_MESSAGE)
+            raise PublicReportUnavailable(
+                f"Public report unavailable (HTTP {int(response.status_code)})."
+            )
         content_type = response.headers.get("Content-Type", "").split(";", 1)[0].strip().lower()
         if content_type not in {"application/json", "text/json"}:
-            raise PublicReportUnavailable(PUBLIC_ERROR_MESSAGE)
+            raise PublicReportUnavailable(PUBLIC_FORMAT_ERROR_MESSAGE)
         content_length = response.headers.get("Content-Length")
         if content_length is not None:
             try:
                 if int(content_length) > MAX_REPORT_BYTES:
-                    raise PublicReportUnavailable(PUBLIC_ERROR_MESSAGE)
+                    raise PublicReportUnavailable(PUBLIC_FORMAT_ERROR_MESSAGE)
             except ValueError as exc:
-                raise PublicReportUnavailable(PUBLIC_ERROR_MESSAGE) from exc
+                raise PublicReportUnavailable(PUBLIC_FORMAT_ERROR_MESSAGE) from exc
         chunks: list[bytes] = []
         size = 0
         for chunk in response.iter_content(chunk_size=64 * 1024):
@@ -107,10 +111,12 @@ def load_public_report(
                 continue
             size += len(chunk)
             if size > MAX_REPORT_BYTES:
-                raise PublicReportUnavailable(PUBLIC_ERROR_MESSAGE)
+                raise PublicReportUnavailable(PUBLIC_FORMAT_ERROR_MESSAGE)
             chunks.append(chunk)
         return parse_public_report(b"".join(chunks))
-    except (requests.RequestException, PublicReportUnavailable) as exc:
+    except PublicReportUnavailable:
+        raise
+    except requests.RequestException as exc:
         raise PublicReportUnavailable(PUBLIC_ERROR_MESSAGE) from exc
     finally:
         if response is not None:

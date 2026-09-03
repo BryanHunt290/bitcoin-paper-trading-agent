@@ -95,7 +95,9 @@ def test_unavailable_source_fails_closed_without_trace_or_credential_prompt(monk
     app = run_app()
 
     assert not app.exception
-    assert [error.value for error in app.error] == ["Data temporarily unavailable"]
+    assert [error.value for error in app.error] == [
+        "Public report unavailable (source configuration invalid)."
+    ]
     assert not app.text_input
     visible = " ".join(
         [element.value for element in app.error]

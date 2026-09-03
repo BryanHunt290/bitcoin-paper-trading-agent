@@ -9,7 +9,9 @@ import requests
 from src.public_dashboard.data_source import (
     DEFAULT_PUBLIC_REPORT_ALLOWED_HOST,
     DEFAULT_PUBLIC_REPORT_URL,
+    PUBLIC_CONFIG_ERROR_MESSAGE,
     PUBLIC_ERROR_MESSAGE,
+    PUBLIC_FORMAT_ERROR_MESSAGE,
     PublicReportUnavailable,
     configured_source,
     load_public_report,
@@ -95,7 +97,7 @@ def test_malformed_or_infrastructure_fields_fail_closed(field: str, value: str):
     payload = json.loads(SAMPLE_PATH.read_text(encoding="utf-8"))
     payload[field] = value
 
-    with pytest.raises(PublicReportUnavailable, match=f"^{PUBLIC_ERROR_MESSAGE}$"):
+    with pytest.raises(PublicReportUnavailable, match="invalid data format"):
         parse_public_report(json.dumps(payload).encode())
 
 
@@ -110,7 +112,7 @@ def test_free_form_internal_text_is_not_accepted(section: str, field: str, value
     payload = json.loads(SAMPLE_PATH.read_text(encoding="utf-8"))
     payload[section][field] = value
 
-    with pytest.raises(PublicReportUnavailable, match=f"^{PUBLIC_ERROR_MESSAGE}$"):
+    with pytest.raises(PublicReportUnavailable, match="invalid data format"):
         parse_public_report(json.dumps(payload).encode())
 
 
@@ -130,6 +132,33 @@ def test_unavailable_reporting_source_returns_only_safe_error(monkeypatch):
     assert "endpoint" not in str(exc_info.value)
 
 
+def test_http_status_is_reported_without_exposing_the_source(monkeypatch):
+    response = FakeResponse(b"")
+    response.status_code = 404
+    monkeypatch.setattr(requests, "get", lambda *args, **kwargs: response)
+
+    with pytest.raises(PublicReportUnavailable) as exc_info:
+        load_public_report(
+            "https://reports.example.invalid/public-report.json",
+            "reports.example.invalid",
+        )
+
+    assert str(exc_info.value) == "Public report unavailable (HTTP 404)."
+    assert "reports.example.invalid" not in str(exc_info.value)
+
+
+def test_invalid_public_report_has_safe_format_diagnostic(monkeypatch):
+    monkeypatch.setattr(requests, "get", lambda *args, **kwargs: FakeResponse(b"not json"))
+
+    with pytest.raises(PublicReportUnavailable) as exc_info:
+        load_public_report(
+            "https://reports.example.invalid/public-report.json",
+            "reports.example.invalid",
+        )
+
+    assert str(exc_info.value) == PUBLIC_FORMAT_ERROR_MESSAGE
+
+
 @pytest.mark.parametrize(
     ("url", "host"),
     [
@@ -144,8 +173,10 @@ def test_unavailable_reporting_source_returns_only_safe_error(monkeypatch):
     ],
 )
 def test_remote_source_is_fixed_https_read_only(url: str, host: str):
-    with pytest.raises(PublicReportUnavailable, match=f"^{PUBLIC_ERROR_MESSAGE}$"):
+    with pytest.raises(PublicReportUnavailable) as exc_info:
         load_public_report(url, host)
+
+    assert str(exc_info.value) == PUBLIC_CONFIG_ERROR_MESSAGE
 
 
 def test_remote_source_uses_get_without_credentials_or_redirects(monkeypatch):

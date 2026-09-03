@@ -178,8 +178,8 @@ with st.sidebar:
 source_url, allowed_host = data_source.configured_source()
 try:
     report = PublicPaperReport.model_validate(load_report_cached(source_url, allowed_host))
-except PublicReportUnavailable:
-    st.error("Data temporarily unavailable", icon=":material/cloud_off:")
+except PublicReportUnavailable as exc:
+    st.error(str(exc), icon=":material/cloud_off:")
     st.caption(
         "The public report could not be loaded. This dashboard will not fall back to private AWS access."
     )
