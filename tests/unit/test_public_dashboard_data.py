@@ -7,8 +7,11 @@ import pytest
 import requests
 
 from src.public_dashboard.data_source import (
+    DEFAULT_PUBLIC_REPORT_ALLOWED_HOST,
+    DEFAULT_PUBLIC_REPORT_URL,
     PUBLIC_ERROR_MESSAGE,
     PublicReportUnavailable,
+    configured_source,
     load_public_report,
     parse_public_report,
 )
@@ -44,6 +47,16 @@ def test_public_report_contract_accepts_sanitized_sample():
     assert report.strategy.last_result == "NO_DIP"
     assert len(report.trades) == 3
     assert len(report.candles) == 20
+
+
+def test_default_source_is_the_fixed_read_only_public_feed(monkeypatch):
+    monkeypatch.delenv("PUBLIC_REPORT_URL", raising=False)
+    monkeypatch.delenv("PUBLIC_REPORT_ALLOWED_HOST", raising=False)
+
+    assert configured_source() == (
+        DEFAULT_PUBLIC_REPORT_URL,
+        DEFAULT_PUBLIC_REPORT_ALLOWED_HOST,
+    )
 
 
 def test_live_status_contract_accepts_unavailable_history_metrics():

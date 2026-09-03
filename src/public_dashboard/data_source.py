@@ -12,6 +12,8 @@ from .models import PublicPaperReport
 
 
 DEFAULT_REPORT_PATH = Path(__file__).resolve().parents[2] / "data" / "public_report.example.json"
+DEFAULT_PUBLIC_REPORT_URL = "https://d7b1bfh5qyfdc.cloudfront.net/public-latest.json"
+DEFAULT_PUBLIC_REPORT_ALLOWED_HOST = "d7b1bfh5qyfdc.cloudfront.net"
 MAX_REPORT_BYTES = 2_000_000
 PUBLIC_ERROR_MESSAGE = "Data temporarily unavailable"
 
@@ -34,8 +36,11 @@ def parse_public_report(payload: bytes) -> PublicPaperReport:
 def configured_source() -> tuple[str, str]:
     """Return operator-controlled source configuration; visitors cannot set it."""
     return (
-        os.environ.get("PUBLIC_REPORT_URL", "").strip(),
-        os.environ.get("PUBLIC_REPORT_ALLOWED_HOST", "").strip().lower(),
+        os.environ.get("PUBLIC_REPORT_URL", DEFAULT_PUBLIC_REPORT_URL).strip(),
+        os.environ.get(
+            "PUBLIC_REPORT_ALLOWED_HOST",
+            DEFAULT_PUBLIC_REPORT_ALLOWED_HOST,
+        ).strip().lower(),
     )
 
 

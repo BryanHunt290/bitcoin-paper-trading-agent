@@ -10,19 +10,22 @@ The repository is a sanitized snapshot. It does not expose the private deploymen
 
 The included Streamlit dashboard is a separate observability surface. It displays sanitized paper portfolio values, BTC-USD candles, simulated entries and exits, strategy and risk status, performance metrics, and recent paper trades. It has no order controls, AWS SDK client, credential input, private gateway, or write-capable data path.
 
-Run it locally with the bundled sanitized sample report:
+Run it locally against the same sanitized, read-only live status feed used by the
+public site:
 
 ```bash
 python -m pip install -r requirements.txt -r requirements-dashboard.txt
 python -m streamlit run streamlit_app.py
 ```
 
-For a live public deployment, the site operator—not a visitor—can configure two environment variables:
+The repository contains the fixed HTTPS feed address, so Streamlit Community Cloud
+does not need AWS credentials or secrets. The site operator—not a visitor—can
+override it with two environment variables:
 
 - `PUBLIC_REPORT_URL`: the fixed HTTPS address of one sanitized JSON document
 - `PUBLIC_REPORT_ALLOWED_HOST`: the exact hostname permitted by the dashboard
 
-Both values must be present, the URL must use HTTPS, redirects and query strings are rejected, and no credentials are accepted. If the source is missing, malformed, or unavailable, the dashboard displays `Data temporarily unavailable` and never falls back to private AWS access.
+Both values must be present, the URL must use HTTPS, redirects and query strings are rejected, and no credentials are accepted. Setting both values to empty strings selects the bundled synthetic sample for local development. If a configured live source is malformed or unavailable, the dashboard displays `Data temporarily unavailable` and never falls back to private AWS access.
 
 The strict public contract is defined in `src/public_dashboard/models.py`; `data/public_report.example.json` is synthetic and contains no private project data. A validated live document displays the badge `LIVE PROJECT DATA — PAPER TRADING ONLY`, while the bundled file is explicitly labeled as sample data.
 

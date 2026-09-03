@@ -15,8 +15,8 @@ def run_app() -> AppTest:
 
 
 def test_dashboard_renders_portfolio_history_and_paper_mode(monkeypatch):
-    monkeypatch.delenv("PUBLIC_REPORT_URL", raising=False)
-    monkeypatch.delenv("PUBLIC_REPORT_ALLOWED_HOST", raising=False)
+    monkeypatch.setenv("PUBLIC_REPORT_URL", "")
+    monkeypatch.setenv("PUBLIC_REPORT_ALLOWED_HOST", "")
     app = run_app()
 
     assert not app.exception
@@ -49,8 +49,8 @@ def test_dashboard_renders_portfolio_history_and_paper_mode(monkeypatch):
 
 
 def test_automatic_strategy_view_emulates_private_status_without_controls(monkeypatch):
-    monkeypatch.delenv("PUBLIC_REPORT_URL", raising=False)
-    monkeypatch.delenv("PUBLIC_REPORT_ALLOWED_HOST", raising=False)
+    monkeypatch.setenv("PUBLIC_REPORT_URL", "")
+    monkeypatch.setenv("PUBLIC_REPORT_ALLOWED_HOST", "")
     app = run_app()
 
     app.segmented_control(key="workspace_view").set_value("Automatic strategy").run()
@@ -71,8 +71,8 @@ def test_automatic_strategy_view_emulates_private_status_without_controls(monkey
 
 
 def test_public_ui_has_no_order_or_administrative_controls(monkeypatch):
-    monkeypatch.delenv("PUBLIC_REPORT_URL", raising=False)
-    monkeypatch.delenv("PUBLIC_REPORT_ALLOWED_HOST", raising=False)
+    monkeypatch.setenv("PUBLIC_REPORT_URL", "")
+    monkeypatch.setenv("PUBLIC_REPORT_ALLOWED_HOST", "")
     app = run_app()
 
     assert not app.exception
