@@ -1,0 +1,40 @@
+# Virtual environments
+.venv/
+.venv312/
+venv/
+
+# Python caches
+__pycache__/
+*.py[cod]
+
+# Testing caches
+.pytest_cache/
+
+# Tooling caches
+.mypy_cache/
+.ruff_cache/
+
+# Env files
+.env
+.env.*
+
+# CDK
+cdk.out/
+cdk/deploy-outputs.json
+
+# Logs
+*.log
+
+# Editor/project files
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+
+# Temporary files
+*.tmp
+*.bak
+ 
+# Local inspection scripts
+scripts/

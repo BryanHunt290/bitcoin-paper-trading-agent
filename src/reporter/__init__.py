@@ -1,0 +1,1 @@
+"""Paper-performance reporting adapters."""
