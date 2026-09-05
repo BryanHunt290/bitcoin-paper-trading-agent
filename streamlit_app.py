@@ -343,11 +343,16 @@ elif view == "Automatic strategy":
 elif view == "Performance":
     with st.container(horizontal=True):
         st.metric("Total return", percent(report.performance.return_pct), border=True)
-        st.metric("Completed trades", optional_count(report.performance.completed_trades), border=True)
+        st.metric("Completed sells", optional_count(report.performance.completed_trades), border=True)
         st.metric("Wins", optional_count(report.performance.wins), border=True)
         st.metric("Losses", optional_count(report.performance.losses), border=True)
         st.metric("Win rate", optional_percent(report.performance.win_rate), border=True)
         st.metric("Maximum drawdown", percent(report.performance.max_drawdown_pct), border=True)
+    st.caption("Each sell, including a partial sell, counts as one result. Wins and losses use "
+               "average entry cost including buy and sell fees. Open buys are not wins. "
+               "Counts cover the complete saved history; the table shows up to 500 recent fills.")
+    if report.performance.completed_trades is None:
+        st.info("The public feed has not supplied complete trade history. Unavailable does not mean zero trades.")
     with st.container(border=True):
         st.subheader("Paper equity comparison", icon=":material/query_stats:")
         equity = pd.DataFrame(
@@ -397,6 +402,10 @@ elif view == "Risk & history":
                         "BTC quantity": trade.quantity,
                         "Paper notional": trade.notional,
                         "Realized P&L": trade.realized_pnl,
+                        "Fees": trade.fees,
+                        "Result": ("Entry" if trade.side == "BUY" else "Unavailable" if trade.realized_pnl is None
+                                   else "Break-even" if abs(trade.realized_pnl) < 1e-10
+                                   else "Win" if trade.realized_pnl > 0 else "Loss"),
                     }
                     for trade in reversed(report.trades)
                 ]
@@ -411,7 +420,8 @@ elif view == "Risk & history":
                     "Price": st.column_config.NumberColumn(format="$%.2f"),
                     "BTC quantity": st.column_config.NumberColumn(format="%.8f"),
                     "Paper notional": st.column_config.NumberColumn(format="$%.2f"),
-                    "Realized P&L": st.column_config.NumberColumn(format="$%.2f"),
+                    "Realized P&L": st.column_config.NumberColumn("Net sell P&L", format="$%.6f"),
+                    "Fees": st.column_config.NumberColumn(format="$%.6f"),
                 },
             )
         else:

@@ -200,3 +200,13 @@ def test_remote_source_uses_get_without_credentials_or_redirects(monkeypatch):
         "Accept": "application/json",
         "User-Agent": "paper-observability-dashboard/1",
     }
+
+def test_public_feed_accepts_sanitized_fees_and_generic_fill():
+    payload = json.loads(SAMPLE_PATH.read_text())
+    payload['trades'][0]['reason'] = 'PAPER_FILL'
+    payload['trades'][0]['fees'] = 0.000001
+    report = parse_public_report(json.dumps(payload).encode())
+    assert report.trades[0].fees == 0.000001
+    payload['trades'][0]['account_id'] = 'private'
+    with pytest.raises(PublicReportUnavailable):
+        parse_public_report(json.dumps(payload).encode())

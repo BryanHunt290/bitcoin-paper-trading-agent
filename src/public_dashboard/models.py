@@ -48,15 +48,17 @@ class PublicTrade(PublicModel):
         "STOP_LOSS",
         "TRAILING_STOP",
         "PAPER_REBALANCE",
+        "PAPER_FILL",
     ]
     price: float = Field(gt=0)
     quantity: float = Field(gt=0)
     notional: float = Field(gt=0)
     realized_pnl: float | None = None
+    fees: float | None = Field(default=None, ge=0)
 
     _timestamp_is_aware = field_validator("executed_at")(_require_timezone)
 
-    @field_validator("price", "quantity", "notional", "realized_pnl")
+    @field_validator("price", "quantity", "notional", "realized_pnl", "fees")
     @classmethod
     def values_are_finite(cls, value: float | None) -> float | None:
         if value is not None and not math.isfinite(value):

@@ -34,7 +34,7 @@ def test_dashboard_renders_portfolio_history_and_paper_mode(monkeypatch):
     app.segmented_control(key="workspace_view").set_value("Performance").run()
     assert not app.exception
     metrics = {metric.label: metric.value for metric in app.metric}
-    assert metrics["Completed trades"] == "6"
+    assert metrics["Completed sells"] == "6"
     assert metrics["Win rate"] == "50.00%"
     assert metrics["Maximum drawdown"] == "1.28%"
 
