@@ -1,12 +1,22 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+import importlib
 
 import altair as alt
 import pandas as pd
 import streamlit as st
 
 from src.public_dashboard import data_source
+from src.public_dashboard import models as report_models
+
+# Community Cloud can rerun this entrypoint before replacing already-imported
+# modules during a rolling source update. Refresh the schema and its consumer
+# once when that older contract is still loaded; retain strict validation.
+if "fees" not in report_models.PublicTrade.model_fields:
+    importlib.reload(report_models)
+    importlib.reload(data_source)
+
 from src.public_dashboard.data_source import PublicReportUnavailable
 from src.public_dashboard.models import PublicPaperReport
 
